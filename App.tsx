@@ -18,3 +18,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
+
+import React from "react";
+import { Home } from "./src/screens";
+
+export default function App() {
+  return <Home />;
+}
