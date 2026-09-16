@@ -1,74 +1,92 @@
-import React, { useState } from "react";
-import { View, Text, ScrollView } from "react-native";
+import React, { useCallback, useState } from "react";
+import { View, Text, ScrollView, Button } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { Especialidade } from "../types/especialidade";
-import { Paciente } from "../types/paciente";
-import { Medico } from "../interfaces/medico";
+import { useFocusEffect } from "@react-navigation/native";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { RootStackParamList } from "../types/navigation";
 import { Consulta } from "../interfaces/consulta";
 import { ConsultaCard } from "../components";
 import { styles } from "../styles/app.styles";
+import { obterConsultas, salvarConsultas } from "../services/storage";
 
-export default function Home() {
-    const cardiologia: Especialidade = {
-        id: 1,
-        nome: "Cardiologia",
-        descricao: "Cuidados com o coração",
-    };
+type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
-    const medico1: Medico = {
-        id: 1,
-        nome: "Dr. Roberto Silva",
-        crm: "CRM12345",
-        especialidade: cardiologia,
-        ativo: true,
-    };
+export default function Home({ navigation }: Props) {
+  const [consultas, setConsultas] = useState<Consulta[]>([]);
 
-    const paciente1: Paciente = {
-        id: 1,
-        nome: "Carlos Andrade",
-        cpf: "123.456.789-00",
-        email: "carlos@email.com",
-        telefone: "(11) 98765-4321",
-    };
+  const carregarConsultas = useCallback(async () => {
+    const consultasSalvas = await obterConsultas();
+    setConsultas(consultasSalvas);
+  }, []);
 
-    const [consulta, setConsulta] = useState<Consulta>({
-        id: 1,
-        medico: medico1,
-        paciente: paciente1,
-        data: new Date(2026, 7, 27),
-        valor: 350,
-        status: "agendada",
-        observacoes: "Consulta de rotina",
-    });
+  useFocusEffect(
+    useCallback(() => {
+      void carregarConsultas();
+    }, [carregarConsultas])
+  );
 
-    function confirmarConsulta() {
-        setConsulta({
-            ...consulta,
-            status: "confirmada",
-        });
-    }
-
-    function cancelarConsulta() {
-        setConsulta({
-            ...consulta,
-            status: "cancelada",
-        });
-    }
-
-    return (
-        <View style={styles.container}>
-            <StatusBar style="light" />
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <View style={styles.header}>
-                    <Text style={styles.titulo}>Sistema de Consultas</Text>
-                    <Text style={styles.subtitulo}>Consulta #{consulta.id}</Text>
-                </View>
-                <ConsultaCard
-                    consulta={consulta}
-                    onConfirmar={confirmarConsulta}
-                    onCancelar={cancelarConsulta}
-                />
-            </ScrollView>
-        </View>
+  async function confirmarConsulta(consultaId: number) {
+    const consultasAtualizadas = consultas.map((consulta) =>
+      consulta.id === consultaId
+        ? { ...consulta, status: "confirmada" as const }
+        : consulta
     );
+
+    setConsultas(consultasAtualizadas);
+    await salvarConsultas(consultasAtualizadas);
+  }
+
+  async function cancelarConsulta(consultaId: number) {
+    const consultasAtualizadas = consultas.map((consulta) =>
+      consulta.id === consultaId
+        ? { ...consulta, status: "cancelada" as const }
+        : consulta
+    );
+
+    setConsultas(consultasAtualizadas);
+    await salvarConsultas(consultasAtualizadas);
+  }
+
+  return (
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.titulo}>Minhas Consultas</Text>
+          <Text style={styles.subtitulo}>
+            {consultas.length} consulta(s) cadastrada(s)
+          </Text>
+        </View>
+
+        <View style={styles.botaoAdmin}>
+          <Button
+            title="Painel Admin"
+            onPress={() => navigation.navigate("Admin")}
+            color="#4CAF50"
+          />
+        </View>
+
+        {consultas.length === 0 ? (
+          <View style={styles.vazio}>
+            <Text style={styles.vazioTexto}>
+              Nenhuma consulta agendada ainda
+            </Text>
+            <Button
+              title="Cadastrar no Admin"
+              onPress={() => navigation.navigate("Admin")}
+            />
+          </View>
+        ) : (
+          consultas.map((consulta) => (
+            <ConsultaCard
+              key={consulta.id}
+              consulta={consulta}
+              onConfirmar={() => void confirmarConsulta(consulta.id)}
+              onCancelar={() => void cancelarConsulta(consulta.id)}
+            />
+          ))
+        )}
+      </ScrollView>
+    </View>
+  );
 }

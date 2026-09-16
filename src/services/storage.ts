@@ -3,76 +3,68 @@ import { Especialidade } from "../types/especialidade";
 import { Medico } from "../interfaces/medico";
 import { Consulta } from "../interfaces/consulta";
 
-const KEYS = {
-    ESPECIALIDADES: "@consultas:especialidades",
-    MEDICOS: "@consultas:medicos",
-    CONSULTAS: "@consultas:consultas",
-};
+export const STORAGE_KEYS = {
+  ESPECIALIDADES: "@consultas:especialidades",
+  MEDICOS: "@consultas:medicos",
+  CONSULTAS: "@consultas:consultas",
+} as const;
 
-
-export async function salvarEspecialidades(especialidades: Especialidade[]) {
-    try {
-        await AsyncStorage.setItem(
-            KEYS.ESPECIALIDADES,
-            JSON.stringify(especialidades)
-        );
-    } catch (erro) {
-        console.error("Erro ao salvar especialidades:", erro);
-    }
+export async function salvarEspecialidades(especialidades: Especialidade[]): Promise<void> {
+  await AsyncStorage.setItem(
+    STORAGE_KEYS.ESPECIALIDADES,
+    JSON.stringify(especialidades)
+  );
 }
 
 export async function obterEspecialidades(): Promise<Especialidade[]> {
-    try {
-        const dados = await AsyncStorage.getItem(KEYS.ESPECIALIDADES);
-        return dados ? JSON.parse(dados) : [];
-    } catch (erro) {
-        console.error("Erro ao obter especialidades:", erro);
-        return [];
-    }
+  const dados = await AsyncStorage.getItem(STORAGE_KEYS.ESPECIALIDADES);
+  if (!dados) return [];
+
+  try {
+    const valor: unknown = JSON.parse(dados);
+    return Array.isArray(valor) ? (valor as Especialidade[]) : [];
+  } catch (erro) {
+    console.error("Erro ao interpretar especialidades:", erro);
+    return [];
+  }
 }
 
-export async function salvarMedicos(medicos: Medico[]) {
-    try {
-        await AsyncStorage.setItem(KEYS.MEDICOS, JSON.stringify(medicos));
-    } catch (erro) {
-        console.error("Erro ao salvar médicos:", erro);
-    }
+export async function salvarMedicos(medicos: Medico[]): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEYS.MEDICOS, JSON.stringify(medicos));
 }
 
 export async function obterMedicos(): Promise<Medico[]> {
-    try {
-        const dados = await AsyncStorage.getItem(KEYS.MEDICOS);
-        return dados ? JSON.parse(dados) : [];
-    } catch (erro) {
-        console.error("Erro ao obter médicos:", erro);
-        return [];
-    }
+  const dados = await AsyncStorage.getItem(STORAGE_KEYS.MEDICOS);
+  if (!dados) return [];
+
+  try {
+    const valor: unknown = JSON.parse(dados);
+    return Array.isArray(valor) ? (valor as Medico[]) : [];
+  } catch (erro) {
+    console.error("Erro ao interpretar médicos:", erro);
+    return [];
+  }
 }
 
-
-export async function salvarConsultas(consultas: Consulta[]) {
-    try {
-        await AsyncStorage.setItem(KEYS.CONSULTAS, JSON.stringify(consultas));
-    } catch (erro) {
-        console.error("Erro ao salvar consultas:", erro);
-    }
+export async function salvarConsultas(consultas: Consulta[]): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEYS.CONSULTAS, JSON.stringify(consultas));
 }
 
 export async function obterConsultas(): Promise<Consulta[]> {
-    try {
-        const dados = await AsyncStorage.getItem(KEYS.CONSULTAS);
-        if (dados) {
-            const consultas = JSON.parse(dados);
-            return consultas.map((consulta: Consulta) => ({
-                ...consulta,
-                data: new Date(consulta.data),
-            }));
-        }
-        return [];
-    } catch (erro) {
-        console.error("Erro ao obter consultas:", erro);
-        return [];
-    }
+  const dados = await AsyncStorage.getItem(STORAGE_KEYS.CONSULTAS);
+  if (!dados) return [];
+
+  try {
+    const valor: unknown = JSON.parse(dados);
+
+    if (!Array.isArray(valor)) return [];
+
+    return valor.map((consulta) => ({
+      ...(consulta as Omit<Consulta, "data"> & { data: string }),
+      data: new Date((consulta as { data: string }).data),
+    }));
+  } catch (erro) {
+    console.error("Erro ao interpretar consultas:", erro);
+    return [];
+  }
 }
-
-
