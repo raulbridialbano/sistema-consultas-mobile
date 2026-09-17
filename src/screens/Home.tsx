@@ -1,88 +1,105 @@
-import React, { useCallback, useState } from "react";
+// Home deixou de listar a clínica inteira e de abrir o Admin.
+// Agora recorta pelo usuário logado: paciente vê as suas; médico vê a agenda.
+
+import React, { useState, useCallback } from "react";
 import { View, Text, ScrollView, Button } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useFocusEffect } from "@react-navigation/native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../types/navigation";
 import { Consulta } from "../interfaces/consulta";
+import { Usuario } from "../types/usuario";
 import { ConsultaCard } from "../components";
 import { styles } from "../styles/app.styles";
 import { obterConsultas, salvarConsultas } from "../services/storage";
+import { consultasDoUsuario } from "../utils/consultasDoUsuario";
 
-type Props = NativeStackScreenProps<RootStackParamList, "Home">;
+type HomeProps = {
+  usuario: Usuario;
+  onSair: () => void;
+  navigation: { navigate: (screen: string) => void };
+};
 
-export default function Home({ navigation }: Props) {
+export default function Home({ usuario, onSair, navigation }: HomeProps) {
   const [consultas, setConsultas] = useState<Consulta[]>([]);
-
-  const carregarConsultas = useCallback(async () => {
-    const consultasSalvas = await obterConsultas();
-    setConsultas(consultasSalvas);
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      void carregarConsultas();
-    }, [carregarConsultas])
+      carregarConsultas();
+    }, [usuario])
   );
 
-  async function confirmarConsulta(consultaId: number) {
-    const consultasAtualizadas = consultas.map((consulta) =>
-      consulta.id === consultaId
-        ? { ...consulta, status: "confirmada" as const }
-        : consulta
-    );
-
-    setConsultas(consultasAtualizadas);
-    await salvarConsultas(consultasAtualizadas);
+  async function carregarConsultas() {
+    const todas = await obterConsultas();
+    setConsultas(consultasDoUsuario(todas, usuario));
   }
 
-  async function cancelarConsulta(consultaId: number) {
-    const consultasAtualizadas = consultas.map((consulta) =>
-      consulta.id === consultaId
-        ? { ...consulta, status: "cancelada" as const }
-        : consulta
+  async function atualizarStatus(
+    consultaId: number,
+    status: "confirmada" | "cancelada"
+  ) {
+    const todas = await obterConsultas();
+    const atualizadas = todas.map((consulta) =>
+      consulta.id === consultaId ? { ...consulta, status } : consulta
     );
-
-    setConsultas(consultasAtualizadas);
-    await salvarConsultas(consultasAtualizadas);
+    await salvarConsultas(atualizadas);
+    setConsultas(consultasDoUsuario(atualizadas, usuario));
   }
+
+  const ehPaciente = usuario.papel === "paciente";
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.titulo}>Minhas Consultas</Text>
+          <Text style={styles.titulo}>Olá, {usuario.nome}</Text>
           <Text style={styles.subtitulo}>
-            {consultas.length} consulta(s) cadastrada(s)
+            {ehPaciente ? "Minhas consultas" : "Agenda do consultório"}
+          </Text>
+          <Text style={styles.papel}>
+            {ehPaciente ? "Paciente" : "Médico"} · {consultas.length} consulta(s)
           </Text>
         </View>
 
-        <View style={styles.botaoAdmin}>
-          <Button
-            title="Painel Admin"
-            onPress={() => navigation.navigate("Admin")}
-            color="#4CAF50"
-          />
+        <View style={styles.acoes}>
+          {ehPaciente ? (
+            <View style={styles.botaoAcao}>
+              <Button
+                title="Agendar consulta"
+                onPress={() => navigation.navigate("Agendar")}
+                color="#4CAF50"
+              />
+            </View>
+          ) : null}
+          <View style={styles.botaoAcao}>
+            <Button title="Sair" onPress={onSair} color="#F44336" />
+          </View>
         </View>
 
         {consultas.length === 0 ? (
           <View style={styles.vazio}>
             <Text style={styles.vazioTexto}>
-              Nenhuma consulta agendada ainda
+              {ehPaciente
+                ? "Nenhuma consulta agendada ainda"
+                : "Nenhuma consulta na sua agenda"}
             </Text>
-            <Button
-              title="Cadastrar no Admin"
-              onPress={() => navigation.navigate("Admin")}
-            />
+            {ehPaciente ? (
+              <Button
+                title="Agendar agora"
+                onPress={() => navigation.navigate("Agendar")}
+              />
+            ) : null}
           </View>
         ) : (
           consultas.map((consulta) => (
             <ConsultaCard
               key={consulta.id}
               consulta={consulta}
-              onConfirmar={() => void confirmarConsulta(consulta.id)}
-              onCancelar={() => void cancelarConsulta(consulta.id)}
+              onConfirmar={
+                ehPaciente
+                  ? undefined
+                  : () => atualizarStatus(consulta.id, "confirmada")
+              }
+              onCancelar={() => atualizarStatus(consulta.id, "cancelada")}
             />
           ))
         )}
